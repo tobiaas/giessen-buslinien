@@ -1,0 +1,525 @@
+<meta charset="utf-8">
+<title>Liniennetz Gießen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#E9EDEF; --panel:#F6F8F9; --ink:#17212B; --mute:#5D6B78; --hair:#CBD3D9;
+  --map:#F2F4F2; --river:#8EC1DE; --rail:#A3ACB4; --road:#FFFFFF; --roadedge:#CED4D8; --bound:#9AA7B2;
+  --halo:#F2F4F2; --busedge:#FFFFFF; --accent:#0B6E8A;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E141A; --panel:#141C24; --ink:#E6ECF1; --mute:#8D9BA8; --hair:#26323D;
+  --map:#111921; --river:#1E4A66; --rail:#3B4752; --road:#253039; --roadedge:#18212A; --bound:#3F4D5A;
+  --halo:#111921; --busedge:#0E141A; --accent:#5CC3E0; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0E141A; --panel:#141C24; --ink:#E6ECF1; --mute:#8D9BA8; --hair:#26323D;
+  --map:#111921; --river:#1E4A66; --rail:#3B4752; --road:#253039; --roadedge:#18212A; --bound:#3F4D5A;
+  --halo:#111921; --busedge:#0E141A; --accent:#5CC3E0; color-scheme:dark;}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 "Source Sans 3",system-ui,sans-serif;padding-inline:16px;padding-block:16px;box-sizing:border-box}
+.wrap{max-width:1500px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;height:100%}
+@media (max-width:900px){.wrap{grid-template-columns:1fr;height:auto}}
+.stage{position:relative;background:var(--map);border:1px solid var(--hair);border-radius:6px;overflow:hidden;min-height:420px;touch-action:none}
+@media (max-width:900px){.stage{height:72vh}}
+svg#map{display:block;width:100%;height:100%;cursor:grab;user-select:none}
+svg#map.drag{cursor:grabbing}
+.head{position:absolute;left:18px;top:14px;pointer-events:none;max-width:70%}
+.head h1{font:700 clamp(30px,4.2vw,52px)/.9 "Barlow Condensed",sans-serif;letter-spacing:.01em;margin:0;text-transform:uppercase;text-shadow:0 0 6px var(--map),0 0 12px var(--map)}
+.head p{margin:6px 0 0;color:var(--mute);font-size:13px;text-shadow:0 0 4px var(--map)}
+.ctrl{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+.ctrl button{min-width:36px;height:36px;padding:0 8px;border-radius:6px;border:1px solid var(--hair);background:var(--panel);color:var(--ink);font:600 15px/1 "Barlow Condensed",sans-serif;cursor:pointer}
+.ctrl .speed{font-size:13px}
+.ctrl button:focus-visible,.chip:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.clock{position:absolute;left:18px;bottom:14px;font:500 12px "JetBrains Mono",monospace;color:var(--mute);pointer-events:none;text-shadow:0 0 4px var(--map)}
+.info{position:absolute;right:12px;bottom:12px;max-width:min(400px,calc(100% - 24px));background:var(--panel);border:1px solid var(--hair);border-radius:6px;padding:12px 14px}
+.info .big{display:flex;align-items:center;gap:10px}
+.info .route{font:600 20px/1.1 "Barlow Condensed",sans-serif}
+.info .meta{color:var(--mute);font-size:13px;margin-top:6px}
+.info ol{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12.5px;color:var(--mute);max-height:110px;overflow:auto}
+.info ol li::before{content:"● ";color:var(--c)}
+aside{background:var(--panel);border:1px solid var(--hair);border-radius:6px;padding:14px;overflow:auto;display:flex;flex-direction:column;gap:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--hair);background:transparent;color:var(--ink);border-radius:999px;padding:4px 12px;font:600 13px "Source Sans 3",sans-serif;cursor:pointer}
+.tab[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.grp h2{font:600 13px "Barlow Condensed",sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0 0 8px;display:flex;justify-content:space-between}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{--c:#888;min-width:42px;height:30px;padding:0 8px;border-radius:5px;border:0;background:var(--c);color:#fff;font:700 17px/30px "Barlow Condensed",sans-serif;cursor:pointer;transition:opacity .2s,transform .15s;text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.chip.lt{color:#1a1a1a;text-shadow:none}
+.chip.region{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--c);text-shadow:none}
+.chip.off{opacity:.25}
+.chip.sel{transform:translateY(-2px);box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--c)}
+.note{font-size:12px;color:var(--mute);line-height:1.5;margin:0}
+.note a{color:var(--accent)}
+.badge{--c:#888;display:inline-block;min-width:40px;text-align:center;padding:0 8px;border-radius:5px;background:var(--c);color:#fff;font:700 22px/34px "Barlow Condensed",sans-serif}
+.badge.lt{color:#1a1a1a}
+.badge.region{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--c)}
+.hub{font:600 12px "Barlow Condensed",sans-serif;letter-spacing:.04em;fill:var(--ink);paint-order:stroke;stroke:var(--halo);stroke-width:3.5px;stroke-linejoin:round;text-transform:uppercase}
+.place{font:500 11px "Source Sans 3",sans-serif;fill:var(--mute);paint-order:stroke;stroke:var(--halo);stroke-width:3px;stroke-linejoin:round}
+.place.town{font:600 13px "Barlow Condensed",sans-serif;letter-spacing:.14em;text-transform:uppercase;fill:var(--ink)}
+.stopl{font:500 10.5px "Source Sans 3",sans-serif;fill:var(--ink);paint-order:stroke;stroke:var(--halo);stroke-width:3px;stroke-linejoin:round}
+.ns{vector-effect:non-scaling-stroke}
+.info{max-height:calc(100% - 24px);overflow:auto}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.fact{border-top:2px solid var(--c);padding-top:4px}
+.fact b{display:block;font:700 24px/1.05 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums}
+.fact span{font-size:11.5px;color:var(--mute)}
+.info ol.tl{display:block;columns:2;column-gap:14px;max-height:150px}
+.info ol.tl li{break-inside:avoid;display:flex;gap:6px}
+.info ol.tl li::before{content:none}
+.info ol.tl li em{font:500 11.5px "JetBrains Mono",monospace;color:var(--ink);font-style:normal;min-width:30px;text-align:right}
+.src{font-size:11px;color:var(--mute);margin-top:6px}
+.bars{display:flex;flex-direction:column;gap:3px}
+.bar{display:grid;grid-template-columns:44px minmax(0,1fr) 42px;align-items:center;gap:8px;background:none;border:0;padding:1px 0;color:var(--ink);cursor:pointer;text-align:left;font:inherit}
+.bar:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bar .lab{font:700 14px "Barlow Condensed",sans-serif;text-align:right}
+.bar .trk{height:9px;border-radius:2px;background:var(--hair);overflow:hidden}
+.bar .fill{display:block;height:100%;background:var(--c);border-radius:2px}
+.bar .val{font:500 11.5px "JetBrains Mono",monospace;color:var(--mute);font-variant-numeric:tabular-nums}
+.bar.sel .lab,.bar.sel .val{color:var(--c)}
+.axis{display:grid;grid-template-columns:44px minmax(0,1fr) 42px;gap:8px;font:500 10.5px "JetBrains Mono",monospace;color:var(--mute)}
+.axis div{display:flex;justify-content:space-between}
+.ctrl .mode{font:700 12px "JetBrains Mono",monospace;letter-spacing:.04em;color:var(--mute)}
+.ctrl .mode.on{color:#fff;background:#D32F2F;border-color:#D32F2F}
+.head p.live{font:500 12px "JetBrains Mono",monospace;color:var(--ink);margin-top:4px}
+.livebox{border:1px solid var(--hair);border-left:3px solid #D32F2F;border-radius:4px;padding:6px 10px;margin-bottom:10px;font-size:13px}
+.livebox b{font:700 13px "Barlow Condensed",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#D32F2F}
+.livebox ul{margin:4px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px}
+.dl{display:inline-block;min-width:34px;text-align:center;border-radius:3px;font:600 11.5px "JetBrains Mono",monospace;margin-right:6px;padding:0 3px}
+.dl.ok{background:#2E7D32;color:#fff}.dl.slight{background:#F9A825;color:#1a1a1a}.dl.late{background:#C62828;color:#fff}
+.handle{display:none}
+@media (max-width:900px){
+  body{padding:0;height:100dvh;overflow:hidden}
+  .wrap{display:block;height:100%}
+  .stage{position:fixed;inset:0;border:0;border-radius:0;height:auto;min-height:0}
+  .head{top:calc(env(safe-area-inset-top,0px) + 10px);left:16px;max-width:calc(100% - 90px)}
+  .head h1{font-size:30px}
+  .ctrl{top:calc(env(safe-area-inset-top,0px) + 10px)}
+  .ctrl button{min-width:42px;height:38px}
+  .clock{display:none}
+  aside{position:fixed;left:0;right:0;bottom:0;z-index:5;height:82dvh;border:0;border-top:1px solid var(--hair);border-radius:14px 14px 0 0;padding:4px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 24px rgba(0,0,0,.18);transition:transform .3s cubic-bezier(.3,0,.2,1);overscroll-behavior:contain}
+  aside[data-state="peek"]{transform:translateY(calc(82dvh - 150px - env(safe-area-inset-bottom,0px)))}
+  aside[data-state="half"]{transform:translateY(calc(82dvh - 48dvh))}
+  aside[data-state="full"]{transform:none}
+  .handle{display:flex;justify-content:center;align-items:center;width:100%;height:28px;border:0;background:none;cursor:pointer;flex:none}
+  .handle span{width:44px;height:5px;border-radius:3px;background:var(--hair)}
+  aside>*{flex:none}
+  .info{position:static;max-width:none;max-height:none;overflow:visible;border:0;padding:0 0 4px;background:none}
+  .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+  .chip{flex:none}
+}
+@media (prefers-reduced-motion:reduce){aside{transition:none}}
+</style>
+
+<div class="wrap">
+  <div class="stage" id="stage">
+    <svg id="map" role="img" aria-label="Animierte Karte der Buslinien in Gießen"></svg>
+    <div class="head"><h1>Liniennetz<br>Gießen</h1><p id="sub">Stadt- und Regionalbusse durch 35390</p><p class="live" id="live" aria-live="polite"></p></div>
+    <div class="ctrl">
+      <button id="zin" aria-label="Hineinzoomen">+</button><button id="zout" aria-label="Herauszoomen">−</button>
+      <button id="vcity" title="Stadtgebiet zeigen">Stadt</button><button id="vall" title="Gesamtes Netz zeigen">Region</button>
+      <button id="mode" class="mode" aria-pressed="false" title="Live-Positionen oder Simulation">SIM</button><button id="play" aria-label="Animation pausieren">❚❚</button><button id="speed" class="speed" title="Zeitraffer umschalten">2×</button>
+    </div>
+    <div class="clock" id="clock"></div>
+    <div class="info" id="info" hidden></div>
+  </div>
+  <aside data-state="peek">
+    <button class="handle" id="handle" aria-label="Leiste ausklappen"><span></span></button>
+    <div class="tabs" role="group" aria-label="Netz filtern">
+      <button class="tab" data-f="all" aria-pressed="true">Alle</button>
+      <button class="tab" data-f="city" aria-pressed="false">Stadtbus</button>
+      <button class="tab" data-f="region" aria-pressed="false">Regional</button>
+      <button class="tab" data-f="night" aria-pressed="false">Nacht</button>
+    </div>
+    <div class="grp"><h2><span>Stadtbus · SWG</span><span id="nc"></span></h2><div class="chips" id="g-city"></div></div>
+    <div class="grp"><h2><span>Regionalbus · RMV</span><span id="nr"></span></h2><div class="chips" id="g-region"></div></div>
+    <div class="grp"><h2><span>Nachtbus</span><span id="nn"></span></h2><div class="chips" id="g-night"></div></div>
+    <div class="grp"><h2><span>Fahrzeit Endhalt → Endhalt</span><span>Minuten</span></h2><div class="bars" id="bars"></div><div class="axis" id="axis"></div></div>
+    <p class="note">Linie antippen: Die Karte zoomt auf den ganzen Linienweg und zeigt Fahrzeit, Takt und Minuten bis zu jedem Halt. „LIVE“ zeigt die aktuellen Fahrzeugpositionen mit Verspätung (alle 20 s aktualisiert, zwischen den Halten interpoliert). „SIM“ zeigt den Takt im Zeitraffer.</p>
+    <p class="note">Live-Daten: <a href="https://transitous.org" target="_blank" rel="noopener">Transitous</a> (MOTIS) mit Echtzeitdaten aus DELFI/RMV. Ohne Echtzeitmeldung zeigt Transitous die Sollposition.</p>
+    <p class="note">Fahrzeiten: Sollfahrplan aus dem offenen DELFI-Datensatz via <a href="https://gtfs.de" target="_blank" rel="noopener">gtfs.de</a> (CC BY 4.0), Stand 03.10.2026, Stichtag Di 13.10.2026; Nachtbusse Fr/Sa-Nacht. Fahrzeit = Median der häufigsten Fahrtvariante, Takt = Median 9–16 Uhr. Für 6, LT 2, LT 9 und 800 enthält der Datensatz keine Fahrten.</p>
+    <p class="note">Streckenverläufe: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-Mitwirkende</a> (ODbL), beide Fahrtrichtungen zusammengeführt. Einzelne OSM-Relationen (z.&nbsp;B. 800–802, 310) können veraltet sein.</p>
+  </aside>
+</div>
+
+<script>
+const D=__DATA__;
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById('map');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const okColour=c=>/^#[0-9a-fA-F]{6}$/.test(c||'');
+const REG_PAL=["#2E7D6B","#8E5BB5","#C9792B","#3E7CB1","#B5476B","#6E8B2E","#A0632F","#4F6FA8","#9A4E9E","#2F8C8C","#B3802A","#5E7F3A","#7A5BA8","#3D8B5A","#AF5A3C","#4C7FA0","#8A6E2F","#6B5FB0"];
+const NIGHT_C={Venus:"#C4B800",Saturn:"#E53935"};
+const order=r=>{const m=r.match(/\d+/);return (r.startsWith('LT')?100:r.startsWith('ALT')?544:r.startsWith('GI')?500:r.startsWith('X')?900:0)+(m?+m[0]:0)};
+D.lines.sort((a,b)=>order(a.ref)-order(b.ref));
+let ri=0;
+D.lines.forEach(l=>{
+  if(l.kind==='night') l.colour=NIGHT_C[l.ref]||l.colour;
+  else if(l.ref==='11') l.colour='#3A4BB0';
+  else if(l.kind==='region') l.colour=REG_PAL[ri++%REG_PAL.length];
+  if(!okColour(l.colour)) l.colour=REG_PAL[ri++%REG_PAL.length];
+  l.label=l.ref.replace('ALT ','');
+  l.tt=D.times[l.ref]||null;
+});
+const light=c=>{const n=parseInt(c.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;return (r*299+g*587+b*114)/1000>170};
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const short=n=>String(n).replace(/^Gießen[- ]?/,'')||n;
+
+// ---------- view
+const [EX0,EY0,EX1,EY1]=D.ext;
+const CITY_VIEW={x:-8200,y:-6600,w:16400,h:13200};
+const ALL_VIEW={x:EX0,y:EY0,w:EX1-EX0,h:EY1-EY0};
+let vb={...CITY_VIEW},rect={width:1,height:1,left:0,top:0},dirty=true;
+svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+const el=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e};
+const pd=pts=>'M'+pts.map(p=>p[0]+' '+p[1]).join('L');
+const mpp=()=>Math.max(vb.w/(rect.width||1),vb.h/(rect.height||1)); // meters per css px
+function fit(t){const ar=(rect.width||1)/(rect.height||1);if(t.w/t.h<ar){const w=t.h*ar;return {x:t.x-(w-t.w)/2,y:t.y,w,h:t.h}}const h=t.w/ar;return {x:t.x,y:t.y-(h-t.h)/2,w:t.w,h}}
+
+const gBg=el('g',{}),gPlace=el('g',{}),gLines=el('g',{}),gStops=el('g',{}),gBus=el('g',{}),gLab=el('g',{});
+D.bg.bound.forEach(s=>el('path',{d:pd(s),class:'ns',fill:'none',stroke:'var(--bound)','stroke-width':1.2,'stroke-dasharray':'5 4'},gBg));
+D.bg.road.forEach(s=>el('path',{d:pd(s),class:'ns',fill:'none',stroke:'var(--roadedge)','stroke-width':5,'stroke-linecap':'round','stroke-linejoin':'round'},gBg));
+D.bg.road.forEach(s=>el('path',{d:pd(s),class:'ns',fill:'none',stroke:'var(--road)','stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'},gBg));
+D.bg.rail.forEach(s=>el('path',{d:pd(s),class:'ns',fill:'none',stroke:'var(--rail)','stroke-width':1.2,'stroke-dasharray':'4 3'},gBg));
+D.bg.river.forEach(([n,s])=>el('path',{d:pd(s),class:'ns',fill:'none',stroke:'var(--river)','stroke-width':n==='Lahn'?4.5:2,'stroke-linecap':'round','stroke-linejoin':'round'},gBg));
+const places=D.bg.place.filter(p=>p[2]&&p[2]!=='Gießen').map(([x,y,n,town])=>{
+  const g=el('g',{},gPlace);el('circle',{r:town?2.6:1.8,fill:'var(--mute)'},g);
+  const t=el('text',{x:5,y:4,class:'place'+(town?' town':'')},g);t.textContent=n;return {x,y,g,town};
+});
+
+// ---------- lines
+const PXW={city:3.4,region:2.4,night:2.4};
+D.lines.forEach(l=>{
+  l.g=el('g',{'data-ref':l.ref},gLines);l.g.style.cursor='pointer';
+  l.paths=l.segs.map(s=>{const a={d:pd(s),class:'ns',fill:'none',stroke:l.colour,'stroke-width':PXW[l.kind],'stroke-linecap':'round','stroke-linejoin':'round','stroke-opacity':l.kind==='city'?.95:.85};
+    if(l.kind==='night')a['stroke-dasharray']='6 4';else a.pathLength=1;return el('path',a,l.g)});
+  l.segs.forEach(s=>el('path',{d:pd(s),class:'ns',fill:'none',stroke:'transparent','stroke-width':14},l.g));
+  l.runPaths=l.runs.map(r=>{const p=document.createElementNS(NS,'path');p.setAttribute('d',pd(r));return p});
+  l.km=l.segs.reduce((a,s)=>{for(let i=1;i<s.length;i++)a+=Math.hypot(s[i][0]-s[i-1][0],s[i][1]-s[i-1][1]);return a},0);
+  const xs=l.segs.flat();l.bb=[Math.min(...xs.map(p=>p[0])),Math.min(...xs.map(p=>p[1])),Math.max(...xs.map(p=>p[0])),Math.max(...xs.map(p=>p[1]))];
+  // real travel speed (m/s) from timetable vs. longest mapped run; clamped to plausible bus speeds
+  const runLen=Math.max(0,...l.runPaths.map(p=>p.getTotalLength()));
+  l.speed=l.tt&&runLen>0?Math.min(14,Math.max(3.5,runLen/(l.tt.dur*60))):(l.kind==='city'?5.5:9);
+});
+if(!reduce){
+  D.lines.forEach((l,i)=>{if(l.kind==='night')return;l.paths.forEach(p=>
+    p.animate([{strokeDasharray:'1 1',strokeDashoffset:1},{strokeDasharray:'1 1',strokeDashoffset:0}],{duration:900,delay:60+i*22,easing:'cubic-bezier(.4,0,.2,1)',fill:'backwards'}))});
+}
+
+// ---------- hubs (pre-clustered by name + 400 m)
+const hubs=D.hubs.map(([x,y,n])=>{const g=el('g',{},gLab);el('circle',{r:5,fill:'var(--halo)',stroke:'var(--ink)','stroke-width':2},g);const t=el('text',{x:8,y:4,class:'hub'},g);t.textContent=n;return {x,y,g,t}});
+
+// ---------- buses
+const buses=[];
+D.lines.forEach(l=>{
+  l.runPaths.forEach(p=>{
+    const L=p.getTotalLength(); if(L<500)return;
+    const n=Math.min(l.kind==='city'?6:8,Math.max(1,Math.round(L/(l.kind==='city'?2000:5500))));
+    for(let k=0;k<n;k++){
+      const b=el('g',{},gBus);
+      const c=el('circle',{r:l.kind==='city'?4.2:3.6,fill:l.colour,stroke:'var(--busedge)','stroke-width':1.4},b);
+      const t=el('text',{'text-anchor':'middle',y:2.6,style:`font:700 7.5px "Barlow Condensed",sans-serif;fill:${light(l.colour)?'#1a1a1a':'#fff'}`},b);t.textContent=l.label.replace('GI-','');t.style.display='none';
+      buses.push({l,p,L,b,c,t,s:(k/n)*2*L+Math.random()*400,v:l.speed*(0.9+Math.random()*.2),x:0,y:0,on:true});
+    }
+  });
+});
+
+// ---------- legend chips
+const groups={city:'g-city',region:'g-region',night:'g-night'};
+D.lines.forEach(l=>{
+  const b=document.createElement('button');
+  b.className='chip '+(l.kind==='region'?'region':light(l.colour)?'lt':'');
+  b.style.setProperty('--c',l.colour);b.textContent=l.label;b.title=l.name;b.setAttribute('aria-pressed','false');
+  b.onclick=()=>select(sel===l?null:l);
+  b.onmouseenter=()=>{if(!sel&&visible(l))paint(l)};b.onmouseleave=()=>{if(!sel)paint(null)};
+  document.getElementById(groups[l.kind]).appendChild(b);l.chip=b;
+});
+const cnt=k=>D.lines.filter(l=>l.kind===k).length;
+document.getElementById('nc').textContent=cnt('city')+' Linien';
+document.getElementById('nr').textContent=cnt('region')+' Linien';
+document.getElementById('nn').textContent=cnt('night')+' Linien';
+document.getElementById("sub").textContent=`${D.lines.length} Buslinien durch 35390`;
+
+// ---------- travel-time bars
+const timed=D.lines.filter(l=>l.tt).sort((a,b)=>b.tt.dur-a.tt.dur);
+const maxDur=Math.ceil(Math.max(...timed.map(l=>l.tt.dur))/30)*30;
+const barsEl=document.getElementById('bars');
+timed.forEach(l=>{
+  const b=document.createElement('button');b.className='bar';b.style.setProperty('--c',l.colour);
+  b.title=`${l.tt.from_} → ${l.tt.to}`;
+  b.innerHTML=`<span class="lab">${esc(l.label)}</span><span class="trk"><span class="fill" style="width:${(l.tt.dur/maxDur*100).toFixed(1)}%"></span></span><span class="val">${l.tt.dur} min</span>`;
+  b.onclick=()=>select(sel===l?null:l);
+  b.onmouseenter=()=>{if(!sel&&visible(l))paint(l)};b.onmouseleave=()=>{if(!sel)paint(null)};
+  barsEl.appendChild(b);l.bar=b;
+});
+document.getElementById('axis').innerHTML=`<span></span><div>${[0,1,2,3].map(i=>`<span>${Math.round(maxDur*i/3)}</span>`).join('')}</div><span></span>`;
+
+// ---------- state
+let sel=null,filter='all';
+const visible=l=>filter==='all'||l.kind===filter;
+function paint(focus){
+  D.lines.forEach(l=>{
+    const vis=visible(l),f=!focus||l===focus;
+    l.g.style.opacity=!vis?0.05:(f?1:.1);l.g.style.transition='opacity .3s';
+    l.paths.forEach(p=>p.setAttribute('stroke-width',focus&&l===focus?PXW[l.kind]*2:PXW[l.kind]));
+    l.chip.classList.toggle('off',!vis||!f);
+    if(l.bar){l.bar.style.opacity=!vis||!f?.35:1;l.bar.classList.toggle('sel',l===focus)}
+  });
+  buses.forEach(b=>{const on=b.l===focus;b.on=visible(b.l)&&(!focus||on);b.b.style.display=b.on?'':'none';b.t.style.display=on?'':'none';b.c.setAttribute('r',on?6.5:(b.l.kind==='city'?4.2:3.6))});
+  if(focus) gLines.appendChild(focus.g);
+  dirty=true;
+}
+const info=document.getElementById('info');
+let stopEls=[];
+const minFmt=m=>m>=60?`${Math.floor(m/60)} h ${String(m%60).padStart(2,'0')}`:`${m}`;
+function select(l,refresh){
+  if(l&&!visible(l)) setFilter('all');
+  sel=l;D.lines.forEach(x=>{x.chip.classList.toggle('sel',x===l);x.chip.setAttribute('aria-pressed',x===l)});
+  if(!refresh){paint(l);gStops.replaceChildren();stopEls=[];}
+  if(!l){info.hidden=true;dirty=true;return}
+  if(!refresh) l.stops.forEach(([x,y,n])=>{const g=el('g',{},gStops);el('circle',{r:3.2,fill:'var(--halo)',stroke:l.colour,'stroke-width':1.8},g);const t=el('text',{x:6,y:3.5,class:'stopl'},g);t.textContent=n;stopEls.push({x,y,g,t})});
+  const [a,b,c,d]=l.bb,pad=Math.max(c-a,d-b)*.12+400;
+  // leave room for the info panel (bottom right) on wide screens
+  const wide=rect.width>700&&!matchMedia('(max-width:900px)').matches,ex=wide?(c-a+2*pad)*.75:0,ey=wide?0:(d-b+2*pad)*.9;
+  if(!refresh) flyTo({x:a-pad,y:b-pad,w:c-a+2*pad+ex,h:d-b+2*pad+ey});
+  if(!refresh&&typeof setSheet==='function'&&mq.matches) setSheet('half');
+  const bc=l.kind==='region'?'region':light(l.colour)?'lt':'';
+  const T=l.tt;
+  let html=(typeof liveSummary==='function'?liveSummary(l):'')+`<div class="big"><span class="badge ${bc}" style="--c:${l.colour}">${esc(l.label)}</span><div class="route">${esc(T?short(T.from_):(l.from_||'Rundverkehr'))}${(T?T.to:l.to)?' → '+esc(T?short(T.to):l.to):''}</div></div>`;
+  if(T){
+    const days=T.basis==='wd'?'Mo–Fr':T.basis==='sa'?'Fr/Sa-Nacht':'So';
+    const tr=T.trips,cnts=[['Mo–Fr',tr.wd],['Sa',tr.sa],['So',tr.su]].filter(x=>x[1]).map(x=>`${x[0]} ${x[1]}`).join(' · ')||'—';
+    html+=`<div class="facts" style="--c:${l.colour}">
+      <div class="fact"><b>${T.dur} min</b><span>Fahrzeit${T.dmin!==T.dmax?` (${T.dmin}–${T.dmax})`:''}</span></div>
+      <div class="fact"><b>${T.headway?T.headway+' min':'—'}</b><span>Takt tagsüber${T.headway?'':' (unregelmäßig)'}</span></div>
+      <div class="fact"><b>${esc(T.first)}</b><span>bis ${esc(T.last)} Uhr (${days})</span></div>
+    </div>
+    <div class="meta">Fahrten ${cnts} (beide Richtungen) · ${(l.km/1000).toFixed(1).replace('.',',')} km Linienweg in OSM${l.op?' · '+esc(l.op):''}</div>
+    <ol class="tl">${T.seq.map(([n,m])=>`<li><em>${minFmt(m)}′</em>${esc(short(n))}</li>`).join('')}</ol>
+    <div class="src">Minuten ab Starthalt laut Sollfahrplan${T.longest>T.dmax?` · längste Variante ${T.longest} min`:''}</div>`;
+  }else{
+    html+=`<div class="meta">${esc(l.op||'Betreiber nicht hinterlegt')} · ${l.stops.length} Halte · ${(l.km/1000).toFixed(1).replace('.',',')} km Linienweg · im Fahrplandatensatz keine Fahrten gefunden</div>
+    <ol>${l.stops.map(s=>`<li>${esc(s[2])}</li>`).join('')}</ol>`;
+  }
+  info.style.setProperty('--c',l.colour);const st=info.scrollTop;info.innerHTML=html;info.hidden=false;info.scrollTop=refresh?st:0;
+}
+function setFilter(f){
+  filter=f;document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-pressed',x.dataset.f===f));
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  setFilter(t.dataset.f);
+  if(sel&&!visible(sel))select(null);else paint(sel);
+});
+
+// ---------- marks that keep their pixel size
+function place(g,x,y,k){g.setAttribute('transform',`translate(${x} ${y}) scale(${k})`)}
+function scaleMarks(){
+  const k=mpp();
+  places.forEach(p=>{const show=p.town||k<28;p.g.style.display=show?'':'none';if(show)place(p.g,p.x,p.y,k)});
+  const shown=[];
+  hubs.forEach(h=>{place(h.g,h.x,h.y,k);h.g.style.display=sel?'none':'';const clash=shown.some(o=>Math.hypot(o.x-h.x,o.y-h.y)<k*70);h.t.style.display=clash?'none':'';if(!clash)shown.push(h)});
+  const sl=[];stopEls.forEach(s=>{place(s.g,s.x,s.y,k);const clash=sl.some(o=>Math.abs(o.x-s.x)<k*80&&Math.abs(o.y-s.y)<k*13);s.t.style.display=clash?'none':'';if(!clash)sl.push(s)});
+  gPlace.style.opacity=sel?.5:1;
+}
+function setVB(){svg.setAttribute('viewBox',`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);scaleMarks();dirty=true}
+
+// ---------- pan / zoom (limits expressed in meters per pixel so they agree with fitted views)
+let moved=false,fly=null,press=null;const ptrs=new Map();let pinch=null;
+function toWorld(cx,cy){const s=mpp();const ox=(rect.width*s-vb.w)/2,oy=(rect.height*s-vb.h)/2;return [vb.x-ox+(cx-rect.left)*s,vb.y-oy+(cy-rect.top)*s]}
+const maxMpp=()=>fit({...ALL_VIEW}).w/(rect.width||1)*1.15, MIN_MPP=1.2;
+function zoomAt(f,cx,cy){
+  fly=null;if(cx==null){cx=rect.left+rect.width/2;cy=rect.top+rect.height/2}
+  const cur=mpp(),k=Math.min(maxMpp(),Math.max(MIN_MPP,cur*f))/cur;
+  const [wx,wy]=toWorld(cx,cy);
+  vb={x:wx-(wx-vb.x)*k,y:wy-(wy-vb.y)*k,w:vb.w*k,h:vb.h*k};
+}
+function flyTo(t){
+  t=fit(t);const r=maxMpp()*rect.width;if(t.w>r){const k=r/t.w,cx=t.x+t.w/2,cy=t.y+t.h/2;t={x:cx-t.w*k/2,y:cy-t.h*k/2,w:t.w*k,h:t.h*k}}
+  if(reduce){vb=t;setVB();return}
+  fly={from:{...vb},to:t,t0:performance.now(),d:700};
+}
+svg.addEventListener('wheel',e=>{e.preventDefault();zoomAt(Math.exp(e.deltaY*0.0015),e.clientX,e.clientY);setVB()},{passive:false});
+const midDist=()=>{const [a,b]=[...ptrs.values()];return {x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,d:Math.hypot(a[0]-b[0],a[1]-b[1])}};
+svg.addEventListener('pointerdown',e=>{
+  svg.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);fly=null;
+  if(ptrs.size===1){moved=false;const g=e.target.closest&&e.target.closest('g[data-ref]'),bt=e.target.closest&&e.target.closest('g[data-trip]');const vv=bt&&vehicles.get(bt.dataset.trip);press={ref:g?g.dataset.ref:vv?vv.line.ref:null,x:e.clientX,y:e.clientY,vb:{...vb}};svg.classList.add('drag')}
+  if(ptrs.size===2){pinch=midDist();moved=true}
+});
+svg.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+  if(ptrs.size===2&&pinch){
+    const m=midDist();
+    zoomAt(pinch.d/(m.d||1),pinch.x,pinch.y);           // scale around previous midpoint
+    const s=mpp();vb.x-=(m.x-pinch.x)*s;vb.y-=(m.y-pinch.y)*s; // then follow the midpoint
+    pinch=m;setVB();return;
+  }
+  if(!press)return;
+  const dx=e.clientX-press.x,dy=e.clientY-press.y;if(Math.abs(dx)+Math.abs(dy)>4)moved=true;
+  if(!moved)return;const s=mpp();vb.x=press.vb.x-dx*s;vb.y=press.vb.y-dy*s;setVB();
+});
+const up=e=>{
+  if(!ptrs.has(e.pointerId))return;ptrs.delete(e.pointerId);
+  if(ptrs.size===1){pinch=null;const [p]=[...ptrs.values()];press={ref:null,x:p[0],y:p[1],vb:{...vb}};return}
+  if(ptrs.size===0){
+    svg.classList.remove('drag');
+    if(e.type==='pointerup'&&!moved&&press){
+      const l=press.ref&&D.lines.find(x=>x.ref===press.ref);
+      if(l&&visible(l)) select(sel===l?null:l); else if(sel) select(null);
+    }
+    press=null;pinch=null;
+  }
+};
+svg.addEventListener('pointerup',up);svg.addEventListener('pointercancel',up);
+document.getElementById('zin').onclick=()=>{zoomAt(.7);setVB()};
+document.getElementById('zout').onclick=()=>{zoomAt(1/.7);setVB()};
+document.getElementById('vcity').onclick=()=>flyTo({...CITY_VIEW});
+document.getElementById('vall').onclick=()=>flyTo({...ALL_VIEW});
+function measure(){const r=svg.getBoundingClientRect();rect={width:r.width,height:r.height,left:r.left,top:r.top}}
+new ResizeObserver(()=>{measure();setVB()}).observe(svg);
+addEventListener('scroll',measure,{passive:true});
+measure();setVB();
+
+// ---------- animation: simulation (time-lapse) or live positions
+const SPEEDS=[90,180,360],playBtn=document.getElementById('play'),spBtn=document.getElementById('speed'),modeBtn=document.getElementById('mode');
+let si=1,playing=!reduce,last=performance.now(),lastClock='',mode='sim';
+const setPlay=p=>{playing=p;playBtn.textContent=p?'❚❚':'▶';playBtn.setAttribute('aria-label',p?'Animation pausieren':'Animation starten');dirty=true};
+setPlay(playing);playBtn.onclick=()=>setPlay(!playing);
+spBtn.textContent=(si+1)+'×';
+spBtn.onclick=()=>{si=(si+1)%SPEEDS.length;spBtn.textContent=(si+1)+'×';dirty=true};
+const clock=document.getElementById('clock'),liveEl=document.getElementById('live');
+function move(b){let s=b.s%(2*b.L);if(s>b.L)s=2*b.L-s;const pt=b.p.getPointAtLength(s);b.x=pt.x;b.y=pt.y}
+buses.forEach(move);
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+
+// --- live data (Transitous / MOTIS, realtime from DELFI)
+const API='https://api.transitous.org/api/v1/map/trips';
+const LAT0=50.585,KX=Math.cos(LAT0*Math.PI/180)*111320,KY=110574,CX=8.672,CY=50.585;
+const P=(lat,lon)=>[(lon-CX)*KX,-(lat-CY)*KY];
+const REFMAP={'24':'GI-24','GI-44':'ALT GI-44','N Venus':'Venus','N Saturn':'Saturn','NVenus':'Venus','NSaturn':'Saturn'};
+const byRef=new Map(D.lines.map(l=>[l.ref,l]));
+const gLive=el('g',{},gBus.parentNode);gBus.parentNode.insertBefore(gLive,gLab);
+let vehicles=new Map(),liveOk=false,liveAt=0,pollTimer=null,prec=null;
+function decode(s,p){let i=0,lat=0,lng=0;const out=[],f=10**p;while(i<s.length){for(let k=0;k<2;k++){let sh=0,r=0,b;do{b=s.charCodeAt(i++)-63;r|=(b&31)<<sh;sh+=5}while(b>=32);const v=r&1?~(r>>1):r>>1;if(k)lng+=v;else lat+=v}out.push([lat/f,lng/f])}return out}
+function precisionFor(seg){for(const p of [5,6,7]){const q=decode(seg.polyline,p)[0];if(q&&Math.abs(q[0]-seg.from.lat)<.01&&Math.abs(q[1]-seg.from.lon)<.01)return p}return null}
+function matchLine(seg){
+  const sn=seg.trips&&seg.trips[0]&&seg.trips[0].routeShortName;if(!sn)return null;
+  const l=byRef.get(REFMAP[sn]||sn);if(!l)return null;
+  // same line numbers exist in Wetzlar/Marburg: city lines must touch a Gießen stop
+  if(l.kind==='city'&&!/^8\d\d$/.test(l.ref)){const n=(seg.from.name||'')+(seg.to.name||'');if(!/Gießen/.test(n))return 'maybe'}
+  return l;
+}
+async function poll(){
+  const now=Date.now(),a=new Date(now-60e3).toISOString(),b=new Date(now+150e3).toISOString();
+  const url=`${API}?min=${encodeURIComponent('50.93,8.44')}&max=${encodeURIComponent('50.44,9.15')}&startTime=${a}&endTime=${b}&zoom=16`;
+  try{
+    const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error(r.status);
+    const segs=await r.json();
+    const trips=new Map();
+    for(const s of segs){
+      if(s.mode!=='BUS'||!s.polyline)continue;
+      const m=matchLine(s);if(!m)continue;
+      const id=s.trips[0].tripId;let t=trips.get(id);if(!t){t={id,line:null,maybe:null,segs:[]};trips.set(id,t)}
+      if(m==='maybe')t.maybe=byRef.get(REFMAP[s.trips[0].routeShortName]||s.trips[0].routeShortName);else t.line=m;
+      if(prec==null)prec=precisionFor(s);
+      const pts=decode(s.polyline,prec||5).map(([la,lo])=>P(la,lo));
+      const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+      t.segs.push({t0:Date.parse(s.departure),t1:Date.parse(s.arrival),pts,cum,from:s.from.name,to:s.to.name,
+        delay:Math.round((Date.parse(s.departure)-Date.parse(s.scheduledDeparture))/60000),rt:!!s.realTime});
+    }
+    const next=new Map();
+    for(const t of trips.values()){
+      if(!t.line)continue; // never touched Gießen in this window
+      t.segs.sort((x,y)=>x.t0-y.t0);
+      const v=vehicles.get(t.id)||{g:null};
+      v.line=t.line;v.segs=t.segs;v.id=t.id;
+      if(!v.g){v.g=el('g',{'data-trip':t.id},gLive);v.c=el('circle',{r:4.4,fill:v.line.colour,stroke:'var(--busedge)','stroke-width':1.4},v.g);
+        v.t=el('text',{'text-anchor':'middle',y:2.6,style:`font:700 7.5px "Barlow Condensed",sans-serif;fill:${light(v.line.colour)?'#1a1a1a':'#fff'}`},v.g);v.t.textContent=v.line.label.replace('GI-','')}
+      next.set(t.id,v);
+    }
+    for(const [id,v] of vehicles) if(!next.has(id)) v.g.remove();
+    vehicles=next;liveOk=true;liveAt=now;dirty=true;
+    if(sel)select(sel,true);
+  }catch(err){
+    liveOk=false;
+    if(mode==='live'&&!vehicles.size){setMode('sim',true);liveEl.textContent='Live-Daten gerade nicht erreichbar · Simulation';}
+  }
+}
+function vpos(v,now){
+  const S=v.segs;if(!S.length)return null;
+  if(now<S[0].t0-90e3||now>S[S.length-1].t1+30e3)return null;
+  for(let i=0;i<S.length;i++){
+    const s=S[i];
+    if(now<s.t0) return {x:s.pts[0][0],y:s.pts[0][1],seg:s,wait:true};
+    if(now<=s.t1){
+      const f=s.t1>s.t0?(now-s.t0)/(s.t1-s.t0):1,d=f*s.cum[s.cum.length-1];
+      let j=1;while(j<s.cum.length-1&&s.cum[j]<d)j++;
+      const a=s.pts[j-1],b=s.pts[j]||a,L=(s.cum[j]-s.cum[j-1])||1,u=Math.max(0,Math.min(1,(d-s.cum[j-1])/L));
+      return {x:a[0]+(b[0]-a[0])*u,y:a[1]+(b[1]-a[1])*u,seg:s};
+    }
+  }
+  const s=S[S.length-1],p=s.pts[s.pts.length-1];return {x:p[0],y:p[1],seg:s,wait:true};
+}
+function liveSummary(l){
+  const now=Date.now(),vs=[...vehicles.values()].filter(v=>v.line===l).map(v=>({v,p:vpos(v,now)})).filter(x=>x.p);
+  if(mode!=='live'||!liveOk)return '';
+  if(!vs.length)return `<div class="livebox"><b>Live</b> Gerade kein Bus dieser Linie unterwegs.</div>`;
+  return `<div class="livebox"><b>Live · ${vs.length} ${vs.length===1?'Bus':'Busse'}</b><ul>${vs.map(({p})=>{const d=p.seg.delay;return `<li><span class="dl ${d>=3?'late':d>=1?'slight':'ok'}">${d>0?'+'+d:d<0?d:'±0'}</span> nächster Halt ${esc(short(p.wait?p.seg.from:p.seg.to))}</li>`}).join('')}</ul></div>`;
+}
+function setMode(m,quiet){
+  mode=m;modeBtn.textContent=m==='live'?'● LIVE':'SIM';modeBtn.classList.toggle('on',m==='live');
+  modeBtn.setAttribute('aria-pressed',m==='live');
+  gBus.style.display=m==='sim'?'':'none';gLive.style.display=m==='live'?'':'none';
+  spBtn.hidden=m==='live';
+  clearInterval(pollTimer);pollTimer=null;
+  if(m==='live'){poll();pollTimer=setInterval(()=>{if(!document.hidden)poll()},20000)}
+  else if(!quiet) liveEl.textContent='Simulation · Busse im Zeitraffer, Takt nach Fahrplan';
+  if(sel)select(sel,true);dirty=true;
+}
+modeBtn.onclick=()=>setMode(mode==='live'?'sim':'live');
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&mode==='live')poll()});
+
+function tick(now){
+  const dt=Math.min(64,now-last);last=now;
+  if(fly){const t=Math.min(1,(now-fly.t0)/fly.d),e=ease(t);for(const k of['x','y','w','h'])vb[k]=fly.from[k]+(fly.to[k]-fly.from[k])*e;setVB();if(t>=1)fly=null}
+  const k=mpp();
+  if(mode==='sim'&&(playing||dirty)){
+    const f=SPEEDS[si]/1000;
+    buses.forEach(b=>{
+      if(playing){b.s+=b.v*dt*f;}
+      if(!b.on)return;
+      if(playing)move(b);
+      place(b.b,b.x.toFixed(0),b.y.toFixed(0),k);
+    });
+  }
+  if(mode==='live'){
+    const t=Date.now();let n=0,dsum=0;
+    for(const v of vehicles.values()){
+      const p=vpos(v,t),on=p&&visible(v.line)&&(!sel||sel===v.line);
+      v.g.style.display=on?'':'none';if(p){n++;dsum+=Math.max(0,p.seg.delay)}
+      if(!on)continue;
+      const big=sel===v.line;v.c.setAttribute('r',big?6.5:4.4);v.t.style.display=big?'':'none';
+      place(v.g,p.x.toFixed(0),p.y.toFixed(0),k);
+    }
+    if(liveOk){const age=Math.round((t-liveAt)/1000);liveEl.textContent=`Live · ${n} Busse unterwegs · Ø Verspätung ${n?(dsum/n).toFixed(1).replace('.',','):0} min · vor ${age} s aktualisiert`}
+    else if(!vehicles.size) liveEl.textContent='Live-Daten werden geladen …';
+  }
+  if(mode==='sim'||dirty){
+    const txt=mode==='sim'?`Zeitraffer ${SPEEDS[si]}× · 1 km ≈ ${Math.round(1000/k)} px`:`Echtzeit · 1 km ≈ ${Math.round(1000/k)} px`;
+    if(txt!==lastClock){clock.textContent=txt;lastClock=txt}
+  }
+  dirty=false;
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+setMode('live');
+
+// ---------- mobile bottom sheet
+const sheet=document.querySelector('aside'),handle=document.getElementById('handle');
+const mq=matchMedia('(max-width:900px)');
+const STATES=['peek','half','full'];
+function setSheet(s){sheet.dataset.state=s;handle.setAttribute('aria-label',s==='full'?'Leiste einklappen':'Leiste ausklappen')}
+handle.onclick=()=>setSheet(STATES[(STATES.indexOf(sheet.dataset.state||'peek')+1)%3]);
+function placeInfo(){const home=document.getElementById('stage');if(mq.matches){sheet.insertBefore(info,sheet.children[1])}else{home.appendChild(info)}}
+mq.addEventListener('change',placeInfo);placeInfo();setSheet('peek');
+</script>
